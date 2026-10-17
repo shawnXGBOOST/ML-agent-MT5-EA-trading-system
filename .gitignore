@@ -1,0 +1,34 @@
+# Generated data / models
+phase1_output*/
+*.csv
+*.joblib
+*.pkl
+*.parquet
+
+# Live state, logs, signals (contain account activity)
+live_agent_state*.json
+live_decisions*.jsonl
+signal*.json
+signal*.jsonl
+retrain_log.txt
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets
+.env
+*.key
+credentials*
+
+# MT5 compiled binaries
+*.ex5
+
+# OS
+.DS_Store
+Thumbs.db
+files.zip
+python
