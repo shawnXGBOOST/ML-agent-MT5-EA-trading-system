@@ -1,101 +1,88 @@
 """
-Tests for purged + embargoed walk-forward cross-validation.
+Tests for the purged + embargoed walk-forward splitter.
 
-No market data required — uses a synthetic DataFrame.
+Calls the real `purged_walk_forward_splits` on a synthetic label table.
 """
 
 import numpy as np
 import pandas as pd
 
-# ---------------------------------------------------------------------------
-# Inline purged walk-forward (mirrors train_baselines.purged_walk_forward_splits)
-# ---------------------------------------------------------------------------
+from mltrader.models.train_baselines import purged_walk_forward_splits
 
-def purged_walk_forward_splits(df: pd.DataFrame, n_folds: int, embargo_bars: int):
-    df = df.sort_values("entry_time").reset_index(drop=True)
-    n = len(df)
-    fold_size = n // (n_folds + 1)
-    bar_dur = pd.Timedelta(minutes=15)
-
-    for fold in range(n_folds):
-        test_start = (fold + 1) * fold_size
-        test_end = test_start + fold_size
-        test_idx = df.index[test_start:test_end]
-        test_start_time = df.loc[test_idx[0], "entry_time"]
-
-        embargo_cutoff = test_start_time - bar_dur * embargo_bars
-
-        train_mask = (
-            (df["touch_time"] < test_start_time) &
-            (df["entry_time"] < embargo_cutoff)
-        )
-        train_idx = df.index[train_mask]
-
-        if len(train_idx) < 30:
-            continue
-
-        yield train_idx, test_idx
+BAR = pd.Timedelta(minutes=15)
 
 
-def make_labeled_df(n: int = 300, seed: int = 0) -> pd.DataFrame:
+def make_labels(n=600, max_hold_bars=20, seed=0):
+    """Events one bar apart, each held 1..max_hold_bars bars. Already time-sorted,
+    so row positions match the indices the splitter returns."""
     rng = np.random.default_rng(seed)
-    entry_times = pd.date_range("2023-01-01", periods=n, freq="15min")
-    touch_offsets = rng.integers(1, 96, n)
-    touch_times = entry_times + pd.to_timedelta(touch_offsets * 15, unit="m")
+    entry = pd.date_range("2024-01-01", periods=n, freq="15min")
+    hold = rng.integers(1, max_hold_bars + 1, n)
     return pd.DataFrame({
-        "entry_time": entry_times,
-        "touch_time": touch_times,
-        "y_binary": rng.integers(0, 2, n),
-        "realized_r": rng.normal(0.3, 1.0, n),
+        "entry_time": entry,
+        "touch_time": entry + pd.to_timedelta(hold * 15, unit="m"),
     })
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+def folds(df, n_folds=5, embargo=8):
+    return list(purged_walk_forward_splits(df, n_folds, embargo))
 
-class TestPurgedWalkForward:
 
-    def test_produces_folds(self):
-        df = make_labeled_df()
-        folds = list(purged_walk_forward_splits(df, n_folds=5, embargo_bars=48))
-        assert len(folds) >= 3  # some folds may be skipped if too small
+class TestSplitStructure:
 
-    def test_no_test_in_train(self):
-        """Train indices must never overlap test indices."""
-        df = make_labeled_df(500)
-        for train_idx, test_idx in purged_walk_forward_splits(df, 5, 48):
-            overlap = set(train_idx) & set(test_idx)
-            assert len(overlap) == 0, f"Leakage: {len(overlap)} overlapping indices"
+    def test_yields_folds(self):
+        assert len(folds(make_labels())) >= 3
 
-    def test_train_ends_before_test(self):
-        """All train touch_times must be strictly before test entry_times."""
-        df = make_labeled_df(500)
-        for train_idx, test_idx in purged_walk_forward_splits(df, 5, 48):
-            max_train_touch = df.loc[train_idx, "touch_time"].max()
-            min_test_entry = df.loc[test_idx, "entry_time"].min()
-            assert max_train_touch < min_test_entry, (
-                f"Train touch bleeds into test: {max_train_touch} >= {min_test_entry}"
-            )
+    def test_train_and_test_disjoint(self):
+        for train, test in folds(make_labels()):
+            assert set(train).isdisjoint(set(test))
 
-    def test_embargo_respected(self):
-        """Train entry_times must be at least embargo_bars * 15min before test start."""
-        df = make_labeled_df(500)
-        embargo_bars = 48
-        bar_dur = pd.Timedelta(minutes=15)
-        for train_idx, test_idx in purged_walk_forward_splits(df, 5, embargo_bars):
-            min_test_entry = df.loc[test_idx, "entry_time"].min()
-            max_train_entry = df.loc[train_idx, "entry_time"].max()
-            gap = min_test_entry - max_train_entry
-            assert gap >= bar_dur * embargo_bars, (
-                f"Embargo violated: gap={gap} < {bar_dur * embargo_bars}"
-            )
+    def test_walk_forward_not_kfold(self):
+        """Every training row precedes every test row in time."""
+        df = make_labels()
+        for train, test in folds(df):
+            assert df.loc[train, "entry_time"].max() < df.loc[test, "entry_time"].min()
 
-    def test_folds_are_walk_forward(self):
-        """Test windows must be in chronological order across folds."""
-        df = make_labeled_df(600)
-        test_starts = []
-        for _, test_idx in purged_walk_forward_splits(df, 5, 48):
-            test_starts.append(df.loc[test_idx, "entry_time"].min())
-        for i in range(1, len(test_starts)):
-            assert test_starts[i] > test_starts[i - 1]
+    def test_test_blocks_move_forward(self):
+        df = make_labels()
+        starts = [df.loc[test, "entry_time"].min() for _, test in folds(df)]
+        assert starts == sorted(starts)
+        assert len(set(starts)) == len(starts)
+
+
+class TestLeakageProtection:
+
+    def test_purge_no_label_window_overlaps_test(self):
+        """No training label may still be 'open' when the test fold begins."""
+        df = make_labels()
+        for train, test in folds(df):
+            test_start = df.loc[test, "entry_time"].min()
+            assert df.loc[train, "touch_time"].max() < test_start
+
+    def test_embargo_gap_respected(self):
+        df = make_labels()
+        embargo = 12
+        for train, test in folds(df, embargo=embargo):
+            test_start = df.loc[test, "entry_time"].min()
+            assert df.loc[train, "entry_time"].max() < test_start - embargo * BAR
+
+    def test_purge_removes_straddling_label(self):
+        """A row just before the boundary whose outcome lands inside the test
+        window must be dropped; its short-lived neighbour must be kept."""
+        df = make_labels(n=600, max_hold_bars=2)
+        boundary = int(np.linspace(0, len(df), 6).astype(int)[1])
+        test_start = df.loc[boundary, "entry_time"]
+        df.loc[boundary - 1, "touch_time"] = test_start + 10 * BAR   # straddles
+        train, _ = folds(df, embargo=0)[0]
+        assert (boundary - 1) not in set(train)
+        assert (boundary - 3) in set(train)
+
+    def test_more_embargo_never_adds_training_rows(self):
+        df = make_labels()
+        small = folds(df, embargo=2)
+        large = folds(df, embargo=40)
+        for (tr_small, _), (tr_large, _) in zip(small, large):
+            assert len(tr_large) <= len(tr_small)
+
+    def test_tiny_dataset_yields_nothing(self):
+        assert folds(make_labels(n=40)) == []

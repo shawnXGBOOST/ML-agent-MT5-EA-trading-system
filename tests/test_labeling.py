@@ -1,177 +1,149 @@
 """
-Tests for triple-barrier labeling (staged exit).
+Tests for the production triple-barrier labeler (staged exit with stop-lock).
 
-Uses synthetic OHLCV data — no market data or broker connection required.
+Calls the real `compute_staged_labels` on tiny hand-built bar series where
+the correct outcome can be worked out by hand. No market data needed.
+
+Geometry used throughout (long, ATR = 1, entry = 100):
+    initial stop   = 99.0
+    full TP        = 102.0   (tp_atr_mult = 2)
+    activation     = 100.8   (40% of the way to TP)
+    lock price     = 100.8   (lock_fraction = 1.0)
 """
 
 import numpy as np
 import pandas as pd
+import pytest
 
-# ---------------------------------------------------------------------------
-# Synthetic data helpers
-# ---------------------------------------------------------------------------
+from mltrader.labeling.triple_barrier import compute_staged_labels
 
-def make_bars(n: int = 200, seed: int = 42) -> pd.DataFrame:
-    """Generate synthetic M15 OHLCV bars with deterministic prices."""
-    rng = np.random.default_rng(seed)
-    close = 2000.0 + np.cumsum(rng.normal(0, 1.5, n))
-    high = close + rng.uniform(0.5, 2.0, n)
-    low = close - rng.uniform(0.5, 2.0, n)
-    open_ = close - rng.normal(0, 0.5, n)
-    times = pd.date_range("2024-01-01 00:00", periods=n, freq="15min")
-    return pd.DataFrame({
-        "time": times, "open": open_, "high": high,
-        "low": low, "close": close, "tick_volume": 100,
+BASE = 100.0
+
+
+def make_bars(n=10, bullish=True):
+    """Flat bars at 100 with ATR 1; a BOS event on bar 0 (entry on bar 1 open)."""
+    df = pd.DataFrame({
+        "datetime": pd.date_range("2024-01-01", periods=n, freq="15min"),
+        "open": BASE, "high": BASE + 0.5, "low": BASE - 0.5, "close": BASE,
+        "atr": 1.0,
+        "bos_bullish": False, "bos_bearish": False,
     })
+    df.loc[0, "bos_bullish" if bullish else "bos_bearish"] = True
+    return df
 
 
-def make_events(bars: pd.DataFrame, n_events: int = 20) -> pd.DataFrame:
-    """Fake BOS events evenly spaced through the bar series."""
-    idx = np.linspace(5, len(bars) - 50, n_events, dtype=int)
-    rows = bars.iloc[idx].copy()
-    return pd.DataFrame({
-        "event_time": rows["time"].values,
-        "entry_price": rows["close"].values,
-        "direction": np.where(np.arange(n_events) % 2 == 0, 1, -1),
-        "atr": 2.0,
-    })
+def label(df, **kw):
+    out = compute_staged_labels(df, **kw)
+    assert len(out) == 1
+    return out.iloc[0]
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+class TestLongOutcomes:
 
-class TestTripleBarrierLabel:
-    """Triple-barrier labeling produces valid outputs."""
+    def test_full_tp(self):
+        df = make_bars()
+        df.loc[1, ["high", "low"]] = [102.5, 99.9]
+        row = label(df)
+        assert row["label"] == "FULL_TP"
+        assert row["realized_r"] == pytest.approx(2.0)
+        assert row["y_binary"] == 1
 
-    def _label(self, events, bars, tp_r=2.0, sl_r=1.0,
-               max_bars=96, activation_frac=0.4, lock_frac=1.0):
-        """Inline labeler so tests have no hard import dependency on the EA path."""
-        results = []
-        bar_times = bars["time"].values
+    def test_initial_stop(self):
+        df = make_bars()
+        df.loc[1, ["high", "low"]] = [100.5, 98.9]
+        row = label(df)
+        assert row["label"] == "INITIAL_STOP"
+        assert row["realized_r"] == pytest.approx(-1.0)
+        assert row["y_binary"] == 0
 
-        for _, ev in events.iterrows():
-            entry = ev["entry_price"]
-            direction = ev["direction"]
-            atr = ev["atr"]
-            tp = entry + direction * tp_r * atr
-            sl = entry - direction * sl_r * atr
-            activation = entry + direction * activation_frac * tp_r * atr
-            lock_price = entry + direction * lock_frac * sl_r * atr  # stop locks here
+    def test_locked_stop_after_activation(self):
+        """Bar 1 reaches activation (100.8) without hitting TP/stop; bar 2 falls
+        back through the locked stop -> small win of +0.8R, not a loss."""
+        df = make_bars()
+        df.loc[1, ["high", "low"]] = [100.9, 99.5]
+        df.loc[2, ["high", "low"]] = [100.9, 100.5]
+        row = label(df)
+        assert row["label"] == "LOCKED_STOP"
+        assert row["realized_r"] == pytest.approx(0.8)
+        assert row["y_binary"] == 1
 
-            start_idx = np.searchsorted(bar_times, ev["event_time"])
-            end_idx = min(start_idx + max_bars, len(bars))
+    def test_stop_before_activation_is_a_loss(self):
+        """Dropping through the stop without ever reaching activation stays -1R."""
+        df = make_bars()
+        df.loc[1, ["high", "low"]] = [100.5, 99.5]
+        df.loc[2, ["high", "low"]] = [100.5, 98.5]
+        row = label(df)
+        assert row["label"] == "INITIAL_STOP"
+        assert row["realized_r"] == pytest.approx(-1.0)
 
-            outcome = "TIMEOUT"
-            touch_time = bars.iloc[end_idx - 1]["time"]
-            realized_r = 0.0
-            activated = False
+    def test_timeout_uses_last_close(self):
+        df = make_bars()
+        df.loc[4, "close"] = 100.2          # time barrier = entry_idx(1) + max_bars(3)
+        row = label(df, max_bars=3)
+        assert row["label"] == "TIMEOUT"
+        assert row["realized_r"] == pytest.approx(0.2)
+        assert row["bars_to_touch"] == 3
 
-            for i in range(start_idx, end_idx):
-                bar = bars.iloc[i]
-                # check activation
-                if not activated:
-                    if direction == 1 and bar["high"] >= activation:
-                        activated = True
-                    elif direction == -1 and bar["low"] <= activation:
-                        activated = True
 
-                # check TP
-                if direction == 1 and bar["high"] >= tp:
-                    outcome = "TP"
-                    touch_time = bar["time"]
-                    realized_r = tp_r
-                    break
-                elif direction == -1 and bar["low"] <= tp:
-                    outcome = "TP"
-                    touch_time = bar["time"]
-                    realized_r = tp_r
-                    break
+class TestShortOutcomes:
 
-                # check SL (or locked stop)
-                eff_sl = lock_price if activated else sl
-                if direction == 1 and bar["low"] <= eff_sl:
-                    outcome = "LOCKED_STOP" if activated else "SL"
-                    touch_time = bar["time"]
-                    realized_r = lock_frac if activated else -sl_r
-                    break
-                elif direction == -1 and bar["high"] >= eff_sl:
-                    outcome = "LOCKED_STOP" if activated else "SL"
-                    touch_time = bar["time"]
-                    realized_r = lock_frac if activated else -sl_r
-                    break
+    def test_full_tp_short(self):
+        df = make_bars(bullish=False)
+        df.loc[1, ["high", "low"]] = [100.1, 97.5]
+        row = label(df)
+        assert row["direction"] == "short"
+        assert row["label"] == "FULL_TP"
+        assert row["realized_r"] == pytest.approx(2.0)
 
-            y_binary = 1 if outcome in ("TP", "LOCKED_STOP") else 0
-            results.append({
-                "entry_time": ev["event_time"],
-                "touch_time": touch_time,
-                "outcome": outcome,
-                "y_binary": y_binary,
-                "realized_r": realized_r,
-                "direction": direction,
-                "atr_at_event": atr,
-            })
+    def test_initial_stop_short(self):
+        df = make_bars(bullish=False)
+        df.loc[1, ["high", "low"]] = [101.1, 99.5]
+        row = label(df)
+        assert row["label"] == "INITIAL_STOP"
+        assert row["realized_r"] == pytest.approx(-1.0)
 
-        return pd.DataFrame(results)
+    def test_locked_stop_short(self):
+        df = make_bars(bullish=False)
+        df.loc[1, ["high", "low"]] = [100.5, 99.1]     # reaches activation 99.2
+        df.loc[2, ["high", "low"]] = [99.5, 99.1]      # high 99.5 >= lock 99.2
+        row = label(df)
+        assert row["label"] == "LOCKED_STOP"
+        assert row["realized_r"] == pytest.approx(0.8)
 
-    def test_labels_produced(self):
-        bars = make_bars()
-        events = make_events(bars)
-        labels = self._label(events, bars)
-        assert len(labels) == len(events)
 
-    def test_y_binary_is_binary(self):
-        bars = make_bars()
-        events = make_events(bars)
-        labels = self._label(events, bars)
-        assert set(labels["y_binary"].unique()).issubset({0, 1})
+class TestSchemaAndGuards:
 
-    def test_outcomes_are_valid(self):
-        bars = make_bars()
-        events = make_events(bars)
-        labels = self._label(events, bars)
-        valid = {"TP", "SL", "LOCKED_STOP", "TIMEOUT"}
-        assert set(labels["outcome"].unique()).issubset(valid)
+    def test_output_invariants(self):
+        df = make_bars(n=40)
+        df.loc[[0, 10, 20], "bos_bullish"] = True
+        out = compute_staged_labels(df)
+        assert len(out) == 3
+        assert (out["touch_time"] >= out["entry_time"]).all()
+        assert (out["y_binary"] == (out["realized_r"] > 0).astype(int)).all()
+        assert set(out["label"]) <= {"FULL_TP", "INITIAL_STOP", "LOCKED_STOP", "TIMEOUT"}
 
-    def test_realized_r_sign_tp(self):
-        """TP rows must have positive realized_r."""
-        bars = make_bars()
-        events = make_events(bars)
-        labels = self._label(events, bars)
-        tp_rows = labels[labels["outcome"] == "TP"]
-        if len(tp_rows):
-            assert (tp_rows["realized_r"] > 0).all()
+    def test_price_levels_recorded(self):
+        row = label(make_bars())
+        assert row["entry_price"] == pytest.approx(100.0)
+        assert row["sl_price"] == pytest.approx(99.0)
+        assert row["tp_price"] == pytest.approx(102.0)
+        assert row["activation_price"] == pytest.approx(100.8)
 
-    def test_realized_r_sl_negative(self):
-        """SL rows must have negative realized_r."""
-        bars = make_bars()
-        events = make_events(bars)
-        labels = self._label(events, bars)
-        sl_rows = labels[labels["outcome"] == "SL"]
-        if len(sl_rows):
-            assert (sl_rows["realized_r"] < 0).all()
+    def test_event_with_invalid_atr_is_skipped(self):
+        df = make_bars()
+        df.loc[0, "atr"] = np.nan
+        assert len(compute_staged_labels(df)) == 0
 
-    def test_locked_stop_r_positive(self):
-        """LOCKED_STOP rows must have non-negative realized_r (stop > entry)."""
-        bars = make_bars()
-        events = make_events(bars)
-        labels = self._label(events, bars)
-        locked = labels[labels["outcome"] == "LOCKED_STOP"]
-        if len(locked):
-            assert (locked["realized_r"] >= 0).all()
+    def test_last_bar_event_has_no_entry(self):
+        df = make_bars(n=5)
+        df["bos_bullish"] = False
+        df.loc[4, "bos_bullish"] = True
+        assert len(compute_staged_labels(df)) == 0
 
-    def test_touch_time_after_entry(self):
-        bars = make_bars()
-        events = make_events(bars)
-        labels = self._label(events, bars)
-        assert (labels["touch_time"] >= labels["entry_time"]).all()
+    def test_lock_fraction_above_one_rejected(self):
+        with pytest.raises(ValueError):
+            compute_staged_labels(make_bars(), lock_fraction=1.5)
 
-    def test_no_look_ahead(self):
-        """touch_time must never exceed max_bars after entry_time."""
-        bars = make_bars(300)
-        events = make_events(bars, 10)
-        max_bars = 30
-        labels = self._label(events, bars, max_bars=max_bars)
-        bar_dur = pd.Timedelta(minutes=15)
-        delta = (labels["touch_time"] - labels["entry_time"]) / bar_dur
-        assert (delta <= max_bars + 1).all()
+    def test_missing_columns_rejected(self):
+        with pytest.raises(ValueError):
+            compute_staged_labels(make_bars().drop(columns=["atr"]))
