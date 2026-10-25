@@ -22,15 +22,13 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-
-from mltrader.models.train_baselines import FEATURE_COLS
-from mltrader.calibration.calibration import purged_train_calib_split
-
 import xgboost as xgb
 from sklearn.isotonic import IsotonicRegression
-from sklearn.metrics import roc_auc_score, brier_score_loss
+from sklearn.metrics import brier_score_loss, roc_auc_score
 
+from mltrader.calibration.calibration import purged_train_calib_split
 from mltrader.calibration.calibrators import PlattCalibrator
+from mltrader.models.train_baselines import FEATURE_COLS
 
 
 def run(dataset_path: str, out_dir: str, embargo_bars: int, exclude_recent_months: int = 0,
@@ -139,7 +137,7 @@ def run(dataset_path: str, out_dir: str, embargo_bars: int, exclude_recent_month
     with open(out / "model_meta.json", "w") as f:
         json.dump(meta, f, indent=2)
 
-    print(f"\nSaved:")
+    print("\nSaved:")
     print(f"  {model_path.resolve()}")
     print(f"  {calibrator_path.resolve()}")
     print(f"  {(out / 'model_meta.json').resolve()}")

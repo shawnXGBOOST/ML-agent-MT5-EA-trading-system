@@ -37,6 +37,11 @@ target-version = "py311"
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# Intentionally left as-is to keep live-pipeline behavior unchanged.
+"src/mltrader/data/data_engine.py" = ["E402"]
+"src/mltrader/models/train_baselines.py" = ["F841"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"

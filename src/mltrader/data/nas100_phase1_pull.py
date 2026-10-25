@@ -74,7 +74,7 @@ def run(symbol: str, out_dir: str):
         print(f"  {name}: {len(d)} bars, {d['datetime'].min()} -> {d['datetime'].max()}")
         d.to_csv(out / "raw" / f"{name}_raw.csv", index=False)
 
-    print(f"\nTagging sessions (dynamic DST-aware offset, same as XAUUSD) and detecting events...")
+    print("\nTagging sessions (dynamic DST-aware offset, same as XAUUSD) and detecting events...")
     for name, d in [("H4", h4), ("H1", h1), ("M15", m15)]:
         tagged = data_engine.tag_sessions(d)
         events = data_engine.build_events(tagged)

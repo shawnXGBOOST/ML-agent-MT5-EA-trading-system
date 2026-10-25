@@ -24,16 +24,14 @@ import argparse
 import json
 from pathlib import Path
 
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import roc_auc_score, average_precision_score, log_loss, brier_score_loss
-from sklearn.preprocessing import StandardScaler
-
 import xgboost as xgb
-import lightgbm as lgb
-
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import average_precision_score, brier_score_loss, log_loss, roc_auc_score
+from sklearn.preprocessing import StandardScaler
 
 FEATURE_COLS = [
     "return_1", "return_4", "return_16", "return_48",

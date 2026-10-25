@@ -23,12 +23,10 @@ that Phase 2 (triple-barrier labeling) and Phase 3 (features) will build on.
 """
 
 import argparse
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 
 # ---------------------------------------------------------------------------
 # 1. LOADING — auto-detect MT5 export column layout
