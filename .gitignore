@@ -1,34 +1,60 @@
-# Generated data / models
-phase1_output*/
-*.csv
-*.joblib
-*.pkl
-*.parquet
-
-# Live state, logs, signals (contain account activity)
-live_agent_state*.json
-live_decisions*.jsonl
-signal*.json
-signal*.jsonl
-retrain_log.txt
-*.log
-
-# Python
+# ── Python ──────────────────────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+*.whl
+
+# ── Virtual environments ─────────────────────────────────────────────────────
 .venv/
 venv/
+env/
+ENV/
 
-# Secrets
+# ── Trained models & artefacts ───────────────────────────────────────────────
+*.pkl
+*.joblib
+*.model
+*.json.bak
+models/
+phase1_output/
+
+# ── Live-trading state & signals ─────────────────────────────────────────────
+signal.json
+signal_nas100.json
+live_agent_state.json
+live_agent_state_multi.json
+
+# ── Raw & processed market data ──────────────────────────────────────────────
+*.csv
+data/
+phase1_data/
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Broker / account credentials ─────────────────────────────────────────────
+*.env
 .env
-*.key
-credentials*
+config_secrets.py
+credentials.py
 
-# MT5 compiled binaries
-*.ex5
-
-# OS
+# ── OS / editor noise ────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
-files.zip
-python
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── pytest / coverage ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
