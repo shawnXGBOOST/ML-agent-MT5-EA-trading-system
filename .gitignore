@@ -22,8 +22,8 @@ ENV/
 *.joblib
 *.model
 *.json.bak
-models/
-phase1_output/
+/models/
+/phase1_output/
 
 # ── Live-trading state & signals ─────────────────────────────────────────────
 signal.json
@@ -33,12 +33,12 @@ live_agent_state_multi.json
 
 # ── Raw & processed market data ──────────────────────────────────────────────
 *.csv
-data/
-phase1_data/
+/data/
+/phase1_data/
 
 # ── Logs ─────────────────────────────────────────────────────────────────────
 *.log
-logs/
+/logs/
 
 # ── Broker / account credentials ─────────────────────────────────────────────
 *.env
