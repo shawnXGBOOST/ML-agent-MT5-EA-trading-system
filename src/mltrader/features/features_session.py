@@ -48,8 +48,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import features as features_mod
 from mltrader.data import data_engine
+from mltrader.features import features as features_mod
 
 # US cash session in UTC terms. NY is UTC-5 (EST) / UTC-4 (EDT), so the
 # 09:30-16:00 ET cash session is 14:30-21:00 UTC in winter, 13:30-20:00 UTC

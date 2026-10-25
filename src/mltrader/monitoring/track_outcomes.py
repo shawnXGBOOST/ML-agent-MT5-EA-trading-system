@@ -19,8 +19,8 @@ Usage:
 
 import argparse
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -150,7 +150,7 @@ def run(signal_log_path: str, magic: int, out_dir: str, days_back: int):
     print(f"Avg predicted ev_r: {matched['ev_r'].mean():+.3f}")
 
     print("\nCOMPARISON TO VALIDATED HOLDOUT (Phase 5):")
-    print(f"  Holdout: TP rate 44.5%, net expectancy +0.293R/trade")
+    print("  Holdout: TP rate 44.5%, net expectancy +0.293R/trade")
     print(f"  Live:    win rate {matched['won'].mean():.1%}, avg realized {matched['realized_r'].mean():+.3f}R")
     gap = matched['realized_r'].mean() - 0.293
     print(f"  Gap: {gap:+.3f}R  "

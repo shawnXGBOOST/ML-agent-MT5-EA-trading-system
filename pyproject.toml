@@ -6,18 +6,20 @@ build-backend = "setuptools.build_meta"
 name = "mltrader"
 version = "0.1.0"
 description = "ML swing-trading pipeline: BOS detection → triple-barrier labeling → XGBoost → calibration → EV filter → risk agent → MQL5 EA"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "xgboost==2.1.4",
-    "scikit-learn==1.5.2",
-    "pandas==2.2.3",
-    "numpy==1.26.4",
-    "MetaTrader5==5.0.45; sys_platform == 'win32'",
-    "requests==2.32.3",
-    "joblib==1.4.2",
+    "xgboost==3.0.3",
+    "scikit-learn==1.9.0",
+    "pandas==3.0.5",
+    "numpy==2.4.6",
+    "MetaTrader5==5.0.5120; sys_platform == 'win32'",
+    "requests==2.34.2",
+    "joblib==1.5.1",
+    "lightgbm>=4.0",
 ]
 
 [project.optional-dependencies]
+dashboard = ["flask"]
 dev = [
     "pytest==8.3.4",
     "pytest-cov==6.0.0",
@@ -29,7 +31,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]

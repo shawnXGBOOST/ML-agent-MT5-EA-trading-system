@@ -39,7 +39,7 @@ def read_all_decisions():
     if not path.exists():
         return []
     lines = path.read_text().strip().splitlines()
-    return [json.loads(l) for l in lines if l]
+    return [json.loads(line) for line in lines if line]
 
 
 def read_state():
