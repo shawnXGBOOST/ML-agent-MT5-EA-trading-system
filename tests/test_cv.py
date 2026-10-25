@@ -6,8 +6,6 @@ No market data required — uses a synthetic DataFrame.
 
 import numpy as np
 import pandas as pd
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Inline purged walk-forward (mirrors train_baselines.purged_walk_forward_splits)
@@ -24,7 +22,6 @@ def purged_walk_forward_splits(df: pd.DataFrame, n_folds: int, embargo_bars: int
         test_end = test_start + fold_size
         test_idx = df.index[test_start:test_end]
         test_start_time = df.loc[test_idx[0], "entry_time"]
-        test_end_time = df.loc[test_idx[-1], "touch_time"]
 
         embargo_cutoff = test_start_time - bar_dur * embargo_bars
 

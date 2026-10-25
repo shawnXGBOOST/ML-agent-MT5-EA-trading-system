@@ -4,14 +4,16 @@ Tests for the rule-based risk agent.
 No MT5 connection or real market data — uses Agent directly with synthetic state.
 """
 
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
-from mltrader.agent.agent import Agent, AgentState, RiskConfig, TradeCandidate, AgentDecision
-
+from mltrader.agent.agent import Agent, AgentDecision, AgentState, RiskConfig, TradeCandidate
 
 # ---------------------------------------------------------------------------
 # Fixtures

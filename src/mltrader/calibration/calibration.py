@@ -28,13 +28,11 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import xgboost as xgb
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import brier_score_loss, roc_auc_score
 
-import xgboost as xgb
-
 from mltrader.models.train_baselines import FEATURE_COLS, purged_walk_forward_splits
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers

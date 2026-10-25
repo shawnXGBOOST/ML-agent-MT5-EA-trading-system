@@ -6,8 +6,6 @@ Uses synthetic OHLCV data — no market data or broker connection required.
 
 import numpy as np
 import pandas as pd
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Synthetic data helpers

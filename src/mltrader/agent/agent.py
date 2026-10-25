@@ -25,7 +25,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
-
 # ---------------------------------------------------------------------------
 # Config — your confirmed Phase 0 hard ceilings
 # ---------------------------------------------------------------------------

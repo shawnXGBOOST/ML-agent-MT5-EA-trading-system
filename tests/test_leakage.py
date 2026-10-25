@@ -7,7 +7,6 @@ at bars 0..i — no look-ahead.
 
 import numpy as np
 import pandas as pd
-import pytest
 
 
 def compute_rolling_features(bars: pd.DataFrame, window: int = 20) -> pd.DataFrame:

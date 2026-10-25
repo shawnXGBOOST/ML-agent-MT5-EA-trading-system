@@ -29,7 +29,7 @@ Usage:
 import argparse
 import json
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import joblib
@@ -41,13 +41,12 @@ try:
 except ImportError:
     mt5 = None
 
+from mltrader.agent import news_filter
+from mltrader.agent.agent import Agent, AgentState, RiskConfig, TradeCandidate
+from mltrader.agent.signal_bridge import SignalBridge
 from mltrader.data import data_engine
 from mltrader.features import features as features_mod
 from mltrader.features import regime as regime_mod
-from mltrader.agent.agent import Agent, AgentState, RiskConfig, TradeCandidate
-from mltrader.agent.signal_bridge import SignalBridge
-from mltrader.agent import news_filter
-
 
 STATE_FILE_DEFAULT = "live_agent_state.json"
 

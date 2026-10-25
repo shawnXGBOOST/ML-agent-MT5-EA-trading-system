@@ -30,7 +30,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # Momentum / structure indicators (no external TA library needed)
 # ---------------------------------------------------------------------------

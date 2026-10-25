@@ -37,9 +37,8 @@ Usage:
 
 import argparse
 import json
-import time
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import joblib
 
@@ -48,10 +47,15 @@ try:
 except ImportError:
     mt5 = None
 
-from mltrader.agent.agent import Agent, AgentState, RiskConfig
-from mltrader.agent.signal_bridge import SignalBridge
-from mltrader.execution.live_runner import run_one_cycle, load_state, save_state, wait_until_next_m15_close
 from mltrader.agent import news_filter
+from mltrader.agent.agent import Agent, RiskConfig
+from mltrader.agent.signal_bridge import SignalBridge
+from mltrader.execution.live_runner import (
+    load_state,
+    run_one_cycle,
+    save_state,
+    wait_until_next_m15_close,
+)
 
 STATE_FILE_DEFAULT = "live_agent_state_multi.json"
 DECISIONS_LOG_DEFAULT = "live_decisions_multi.jsonl"
@@ -76,7 +80,7 @@ def run(instruments: list, starting_equity: float, min_ev: float, dry_run: bool,
         raise RuntimeError("MetaTrader5 package not installed. Run: pip install MetaTrader5")
     if not mt5.initialize():
         raise RuntimeError(f"MT5 initialize() failed: {mt5.last_error()}")
-    print(f"Connected to MT5.")
+    print("Connected to MT5.")
 
     print("Loading models for each instrument...")
     loaded = [load_instrument(inst["model_dir"], inst["signal_path"], inst["symbol"])

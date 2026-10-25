@@ -21,11 +21,10 @@ transport layer between Agent.evaluate() and the EA.
 import json
 import os
 import tempfile
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from mltrader.agent.agent import TradeCandidate, AgentDecision
+from mltrader.agent.agent import AgentDecision, TradeCandidate
 
 
 class SignalBridge:

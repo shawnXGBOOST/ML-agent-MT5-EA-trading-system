@@ -37,8 +37,8 @@ import argparse
 import json
 from datetime import datetime, timedelta, timezone
 
-import requests
 import pandas as pd
+import requests
 
 # Public, free, no-API-key JSON mirror of the Forex Factory economic calendar.
 # Widely used by the retail EA community. Covers roughly the current week.

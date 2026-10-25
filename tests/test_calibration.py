@@ -4,18 +4,18 @@ Tests for calibration helpers and EV filter.
 No MT5 / market data — synthetic probabilities and labels.
 """
 
+import os
+import sys
+
 import numpy as np
 import pandas as pd
-import pytest
 
-import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from mltrader.calibration.calibration import (
     expected_calibration_error,
     purged_train_calib_split,
 )
-
 
 # ---------------------------------------------------------------------------
 # Tests: expected_calibration_error
